@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>本地轻量笔记 V1.1（修复版）</title>
+  <style>
+    /* 全局与排版重置 */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      background-color: #f8fafc;
+      color: #334155;
+    }
+
+    /* 左侧边栏：列表区 */
+    #sidebar {
+      width: 280px;
+      min-width: 220px;
+      max-width: 340px;
+      background-color: #ffffff;
+      border-right: 1px solid #e2e8f0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-header {
+      padding: 16px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sidebar-header h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .btn-primary {
+      background-color: #2563eb;
+      color: #ffffff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .btn-primary:hover {
+      background-color: #1d4ed8;
+    }
+
+    /* 笔记列表 */
+    #noteList {
+      flex: 1;
+      overflow-y: auto;
+      list-style: none;
+    }
+
+    .note-item {
+      padding: 14px 16px;
+      border-bottom: 1px solid #f8fafc;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .note-item:hover {
+      background-color: #f1f5f9;
+    }
+
+    .note-item.active {
+      background-color: #e0e7ff;
+      border-left: 4px solid #2563eb;
+    }
+
+    .note-item-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: #1e293b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+
+    /* 新增：正文预览行 */
+    .note-item-preview {
+      font-size: 12px;
+      color: #64748b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+
+    .note-item-date {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .empty-hint {
+      padding: 24px 16px;
+      text-align: center;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    /* 右侧：编辑器主区 */
+    #mainContent {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background-color: #ffffff;
+    }
+
+    .editor-toolbar {
+      padding: 12px 24px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .editor-status {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    /* 新增：未保存状态高亮 */
+    .editor-status.unsaved {
+      color: #d97706;
+      font-weight: 500;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-save {
+      background-color: #059669;
+      color: #ffffff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .btn-save:hover {
+      background-color: #047857;
+    }
+
+    .btn-delete {
+      background-color: #fee2e2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .btn-delete:hover {
+      background-color: #fca5a5;
+    }
+
+    /* 文本输入区域 */
+    .editor-form {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 32px;
+      overflow: hidden;
+    }
+
+    #noteTitle {
+      font-size: 22px;
+      font-weight: 600;
+      border: none;
+      outline: none;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #0f172a;
+    }
+
+    #noteTitle::placeholder {
+      color: #cbd5e1;
+    }
+
+    #noteBody {
+      flex: 1;
+      font-size: 15px;
+      line-height: 1.7;
+      border: none;
+      outline: none;
+      resize: none;
+      color: #334155;
+      font-family: inherit;
+    }
+
+    #noteBody::placeholder {
+      color: #cbd5e1;
+    }
+
+    /* 空白状态提示（无笔记选中时） */
+    #noNotePlaceholder {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #94a3b8;
+      font-size: 15px;
+    }
+  </style>
+<base target="_blank">
+</head>
+<body>
+
+  <!-- 左侧：笔记列表栏 -->
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <h2>我的笔记</h2>
+      <button class="btn-primary" id="btnNewNote">+ 新建</button>
+    </div>
+    <ul id="noteList">
+      <!-- 笔记列表由 JS 动态渲染 -->
+    </ul>
+  </aside>
+
+  <!-- 右侧：笔记查看与编辑栏 -->
+  <main id="mainContent">
+    <!-- 当有选中的笔记时展示编辑面板 -->
+    <div id="editorArea" style="display: none; height: 100%; flex-direction: column;">
+      <div class="editor-toolbar">
+        <span class="editor-status" id="saveStatus">就绪</span>
+        <div class="actions">
+          <button class="btn-save" id="btnSaveNote">保存</button>
+          <button class="btn-delete" id="btnDeleteNote">删除</button>
+        </div>
+      </div>
+      <div class="editor-form">
+        <input type="text" id="noteTitle" placeholder="无标题笔记..." />
+        <textarea id="noteBody" placeholder="从这里开始输入正文内容..."></textarea>
+      </div>
+    </div>
+
+    <!-- 当没有任何笔记时的占位状态 -->
+    <div id="noNotePlaceholder">
+      <p>点击左侧“+ 新建”开始记笔记</p>
+    </div>
+  </main>
+
+  <script>
+    /* ==========================================================
+       1. 数据初始化与状态定义
+       ========================================================== */
+    const STORAGE_KEY = "local_simple_notes_data";
+
+    // 内存中的笔记数组
+    let notes = [];
+    // 当前选中的笔记 ID
+    let currentNoteId = null;
+    // 自动保存防抖定时器
+    let saveTimer = null;
+    // 当前是否有未保存的修改（脏标记）
+    let dirty = false;
+
+    // DOM 元素引用
+    const noteListEl = document.getElementById("noteList");
+    const editorAreaEl = document.getElementById("editorArea");
+    const noNotePlaceholderEl = document.getElementById("noNotePlaceholder");
+    const noteTitleInput = document.getElementById("noteTitle");
+    const noteBodyInput = document.getElementById("noteBody");
+    const saveStatusEl = document.getElementById("saveStatus");
+
+    const btnNew = document.getElementById("btnNewNote");
+    const btnSave = document.getElementById("btnSaveNote");
+    const btnDelete = document.getElementById("btnDeleteNote");
+
+    /* ==========================================================
+       2. 本地存储 (localStorage) 存取函数
+       ========================================================== */
+    // 从 localStorage 读取笔记数据
+    // 【修复 Bug 2】读取后进行数据清洗：防"JSON 合法但字段残缺"的数据导致渲染崩溃
+    function loadNotesFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        notes = (Array.isArray(parsed) ? parsed : [])
+          .filter(n => n && typeof n.id === "string")
+          .map(n => ({
+            id: n.id,
+            title: typeof n.title === "string" ? n.title : "",
+            body: typeof n.body === "string" ? n.body : "",
+            updatedAt: typeof n.updatedAt === "number" ? n.updatedAt : Date.now()
+          }));
+      } catch (err) {
+        console.error("读取本地存储失败", err);
+        notes = [];
+      }
+    }
+
+    // 将笔记数据持久化至 localStorage
+    function saveNotesToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+      } catch (err) {
+        console.error("保存至本地存储失败", err);
+        alert("存储已满或异常，无法保存！");
+      }
+    }
+
+    /* ==========================================================
+       3. 核心业务逻辑
+       ========================================================== */
+    // 渲染左侧列表
+    // 【改进】全部改用 textContent 赋值，天然防 XSS，无需再手动转义
+    function renderNoteList() {
+      noteListEl.innerHTML = "";
+
+      if (notes.length === 0) {
+        const emptyLi = document.createElement("li");
+        emptyLi.className = "empty-hint";
+        emptyLi.textContent = "暂无笔记";
+        noteListEl.appendChild(emptyLi);
+        return;
+      }
+
+      notes.forEach(note => {
+        const li = document.createElement("li");
+        li.className = `note-item ${note.id === currentNoteId ? "active" : ""}`;
+
+        const titleDiv = document.createElement("div");
+        titleDiv.className = "note-item-title";
+        titleDiv.textContent = note.title.trim() === "" ? "无标题笔记" : note.title;
+
+        // 【新增】正文预览行
+        const previewDiv = document.createElement("div");
+        previewDiv.className = "note-item-preview";
+        previewDiv.textContent = note.body.trim() === ""
+          ? ""
+          : note.body.replace(/\s+/g, " ").slice(0, 50);
+
+        const dateDiv = document.createElement("div");
+        dateDiv.className = "note-item-date";
+        // 【改进】日期格式加上年份，跨年的笔记也能看出时间
+        dateDiv.textContent = new Date(note.updatedAt).toLocaleString("zh-CN", {
+          year: "2-digit",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit"
+        });
+
+        li.appendChild(titleDiv);
+        if (previewDiv.textContent !== "") li.appendChild(previewDiv);
+        li.appendChild(dateDiv);
+
+        li.addEventListener("click", () => {
+          selectNote(note.id);
+        });
+
+        noteListEl.appendChild(li);
+      });
+    }
+
+    // 选中某篇笔记并加载到右侧
+    // 【修复 Bug 1a】切换前若当前笔记有未保存修改，先自动保存
+    function selectNote(id) {
+      if (currentNoteId && currentNoteId !== id && dirty) {
+        handleSaveCurrentNote();
+      }
+
+      currentNoteId = id;
+      dirty = false;
+
+      const target = notes.find(n => n.id === id);
+
+      if (target) {
+        editorAreaEl.style.display = "flex";
+        noNotePlaceholderEl.style.display = "none";
+
+        noteTitleInput.value = target.title;
+        noteBodyInput.value = target.body;
+        saveStatusEl.textContent = "已加载";
+        saveStatusEl.classList.remove("unsaved");
+      } else {
+        // 若找不到指定笔记，回到空状态
+        editorAreaEl.style.display = "none";
+        noNotePlaceholderEl.style.display = "flex";
+      }
+
+      renderNoteList();
+    }
+
+    // 【改进】生成笔记 ID：优先 crypto.randomUUID，避免同一毫秒连点新建导致 ID 冲突
+    function generateNoteId() {
+      if (window.crypto && typeof crypto.randomUUID === "function") {
+        return "note_" + crypto.randomUUID();
+      }
+      return "note_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+    }
+
+    // 新建笔记
+    function handleCreateNewNote() {
+      const newNote = {
+        id: generateNoteId(),
+        title: "",
+        body: "",
+        updatedAt: Date.now()
+      };
+
+      // 插入到列表开头
+      notes.unshift(newNote);
+      saveNotesToStorage();
+
+      // 自动切换并聚焦到新笔记
+      selectNote(newNote.id);
+      noteTitleInput.focus();
+      saveStatusEl.textContent = "已新建";
+    }
+
+    // 【修复 Bug 1b】输入即标记"未保存"，并在停顿 800ms 后自动落盘
+    function markDirtyAndScheduleSave() {
+      if (!currentNoteId) return;
+
+      if (!dirty) {
+        dirty = true;
+        saveStatusEl.textContent = "未保存的修改";
+        saveStatusEl.classList.add("unsaved");
+      }
+
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(handleSaveCurrentNote, 800);
+    }
+
+    // 保存当前笔记
+    function handleSaveCurrentNote() {
+      if (!currentNoteId) return;
+      clearTimeout(saveTimer);
+
+      const target = notes.find(n => n.id === currentNoteId);
+      if (target) {
+        target.title = noteTitleInput.value;
+        target.body = noteBodyInput.value;
+        target.updatedAt = Date.now();
+
+        // 重新排到最顶端
+        notes = [target, ...notes.filter(n => n.id !== currentNoteId)];
+
+        saveNotesToStorage();
+        dirty = false;
+        saveStatusEl.textContent = "已保存 " + new Date().toLocaleTimeString();
+        saveStatusEl.classList.remove("unsaved");
+        renderNoteList();
+      }
+    }
+
+    // 删除笔记
+    function handleDeleteCurrentNote() {
+      if (!currentNoteId) return;
+
+      const confirmed = confirm("确定要删除这篇笔记吗？");
+      if (!confirmed) return;
+
+      // 【改进】清除可能挂起的自动保存，避免删除后定时器误触发
+      clearTimeout(saveTimer);
+
+      // 从数组中过滤掉
+      notes = notes.filter(n => n.id !== currentNoteId);
+      saveNotesToStorage();
+      dirty = false;
+
+      // 删除后选中列表第一篇，若无则清空
+      if (notes.length > 0) {
+        selectNote(notes[0].id);
+      } else {
+        currentNoteId = null;
+        editorAreaEl.style.display = "none";
+        noNotePlaceholderEl.style.display = "flex";
+        renderNoteList();
+      }
+    }
+
+    /* ==========================================================
+       4. 事件监听与键盘快捷键
+       ========================================================== */
+    btnNew.addEventListener("click", handleCreateNewNote);
+    btnSave.addEventListener("click", handleSaveCurrentNote);
+    btnDelete.addEventListener("click", handleDeleteCurrentNote);
+
+    // 【修复 Bug 1b】输入时自动调度保存
+    noteTitleInput.addEventListener("input", markDirtyAndScheduleSave);
+    noteBodyInput.addEventListener("input", markDirtyAndScheduleSave);
+
+    // 【新增】关闭/刷新页面前，如有未保存修改则弹出提示
+    window.addEventListener("beforeunload", (e) => {
+      if (dirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    });
+
+    // 支持 Ctrl+S (或 Mac Command+S) 快捷保存
+    window.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        handleSaveCurrentNote();
+      }
+    });
+
+    /* ==========================================================
+       5. 页面初始化启动
+       ========================================================== */
+    function init() {
+      loadNotesFromStorage();
+      if (notes.length > 0) {
+        selectNote(notes[0].id);
+      } else {
+        renderNoteList();
+      }
+    }
+
+    init();
+  </script>
+</body>
+  </html>
